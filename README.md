@@ -21,6 +21,13 @@ use this repository to reproduce issues, test ideas, etc.
 
 ## Build
 
+Tip: use `--depth=1` when updating the git module, to avoid the bloat of
+Vulkan-Headers history.
+
+```
+git submodule update --init --depth=1
+```
+
 Using `clang` as example:
 
 ```sh
@@ -42,6 +49,10 @@ like this:
 ```
 clang -o hello hello.c -IVulkan-Headers/include
 ```
+
+Note: on OSX, MoltenVK is annoying to use outside Xcode. The best advice is to
+copy `libvulkan.dylib` to this folder and setup the ICD/etc in
+`~/.local/share/vulkan/`.
 
 ## Experimenting with this repo
 
