@@ -56,7 +56,7 @@ static int shader(char * name) {
   char spv[1024];
   sprintf(spv, "%s.spv", name);
 
-  char * args[] = { EXE("glslang"), "-V", name, "-o", spv, 0 };
+  char * args[] = { EXE("glslang"), "--target-env", "vulkan1.0", name, "-o", spv, 0 };
   return run(args);
 }
 static int compile_shaders() {
@@ -66,13 +66,16 @@ static int compile_shaders() {
   }
 
   if (shader("hello.comp")) return 1;
+  if (shader("reduce.comp")) return 1;
   return 0;
 }
 
+#define example(X) { \
+  char * args[] = { EXE(CC), "-Wall", "-g", "-IVulkan-Headers/include", "-o", EXE(X), X ".c", 0 }; \
+  if (run(args)) return 1; }
 static int compile_examples() {
-  { char * args[] = { EXE(CC), "-Wall", "-g", "-IVulkan-Headers/include", "-o", EXE("hello"), "hello.c", 0 };
-    if (run(args)) return 1; }
-
+  example("hello");
+  example("reduce");
   return 0;
 }
 

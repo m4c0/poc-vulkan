@@ -1,0 +1,15 @@
+#version 450
+
+layout(set=0, binding=0) readonly buffer in0 { float a[]; };
+layout(set=1, binding=0)          buffer in1 { float b[]; };
+
+void main() {
+  // Vulkan 1.0 approach without subgroupAdd, atomicAdd, etc
+  float x = 0;
+  for (int i = 0; i < 32; i++) {
+    x += a[i * gl_NumWorkGroups.x + gl_GlobalInvocationID.x];
+    // This also works:
+    // x += a[i + gl_GlobalInvocationID.x * 32];
+  }
+  b[gl_GlobalInvocationID.x] = x;
+}
