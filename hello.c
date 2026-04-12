@@ -61,9 +61,10 @@ static void vlk_create_instance() {
   // validation layer will complain.
   const char * ext[] = {
     VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
+    VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
   };
   info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-  info.enabledExtensionCount = 1;
+  info.enabledExtensionCount = 2;
   info.ppEnabledExtensionNames = ext;
 #endif
 
