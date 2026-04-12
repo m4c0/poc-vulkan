@@ -1,2 +1,8 @@
 #version 450
-void main() {}
+
+layout(binding=0) readonly buffer in0 { float a[]; };
+layout(binding=1)          buffer in1 { float b[]; };
+
+void main() {
+  b[gl_GlobalInvocationID.x] = 2 + a[gl_GlobalInvocationID.x];
+}
