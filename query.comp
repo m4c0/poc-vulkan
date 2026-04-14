@@ -1,0 +1,11 @@
+#version 450
+
+layout(binding=0) readonly buffer in0 { float a[]; };
+layout(binding=1)          buffer in1 { float b[]; };
+
+void main() {
+  // Just a slow way of summing all elements
+  for (int i = 0; i < 1024 * 1024; i++) {
+    b[gl_GlobalInvocationID.x] += a[i];
+  }
+}

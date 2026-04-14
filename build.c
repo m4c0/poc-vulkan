@@ -67,6 +67,7 @@ static int compile_shaders() {
 
   if (shader("hello.comp")) return 1;
   if (shader("reduce.comp")) return 1;
+  if (shader("query.comp")) return 1;
   return 0;
 }
 
@@ -76,6 +77,7 @@ static int compile_shaders() {
 static int compile_examples() {
   example("hello");
   example("reduce");
+  example("query");
   return 0;
 }
 
