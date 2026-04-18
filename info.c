@@ -70,6 +70,7 @@ int main() {
     };
     vkGetPhysicalDeviceProperties2(pd[i], &prop);
     printf("%s\n", prop.properties.deviceName);
+    printf("-- Max Compute Work Group Invocations: %d\n", prop.properties.limits.maxComputeWorkGroupInvocations);
     printf("-- Max Compute Work Group Size: %d %d %d\n",
         prop.properties.limits.maxComputeWorkGroupSize[0],
         prop.properties.limits.maxComputeWorkGroupSize[1],
