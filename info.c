@@ -45,18 +45,6 @@ static void vlk_create_instance() {
   volkLoadInstance(vlk_ins);
 }
 
-//static void vlk_allocate_memories() {
-//  VkPhysicalDeviceMemoryProperties props;
-//  vkGetPhysicalDeviceMemoryProperties(vlk_pd, &props);
-//
-//  int local = -1, host = -1;
-//  for (int i = 0; i < props.memoryTypeCount; i++) {
-//    VkMemoryPropertyFlags flags = props.memoryTypes[i].propertyFlags;
-//    if (local == -1 && F(flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) local = i;
-//    if (host == -1 && F(flags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) host = i;
-//  }
-//}
-
 int main() {
   _(volkInitialize());
 
@@ -82,6 +70,10 @@ int main() {
     };
     vkGetPhysicalDeviceProperties2(pd[i], &prop);
     printf("%s\n", prop.properties.deviceName);
+    printf("-- Max Compute Work Group Size: %d %d %d\n",
+        prop.properties.limits.maxComputeWorkGroupSize[0],
+        prop.properties.limits.maxComputeWorkGroupSize[1],
+        prop.properties.limits.maxComputeWorkGroupSize[2]);
     printf("-- Max Memory Allocation Size: %'llu\n", prop3.maxMemoryAllocationSize);
     printf("-- Subgroup Size: %u\n", subg.subgroupSize);
     printf("\n");
