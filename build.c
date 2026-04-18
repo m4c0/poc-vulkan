@@ -6,6 +6,7 @@
 #include <unistd.h>
 #endif
 
+#include <sys/stat.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,13 +52,24 @@ static int run(char ** args) {
   fprintf(stderr, "failed to run child process: %s\n", args[0]);
   return 1;
 }
+static uint64_t mtime(const char * name) {
+#ifdef _WIN32
+  struct __stat64 s = {0};
+  _stat64(name, &s);
+  return s.st_mtime;
+#else
+  struct stat t;
+  if (0 != stat(name, &t)) return 0;
+  return t.st_mtimespec.tv_sec * 1000ULL + t.st_mtimespec.tv_nsec / 1000000;
+#endif
+}
 
 static int shader(char * name) {
   char spv[1024];
   sprintf(spv, "%s.spv", name);
 
   char * args[] = { EXE("glslang"), "--target-env", "vulkan1.0", name, "-o", spv, 0 };
-  return run(args);
+  return (mtime(name) >= mtime(spv)) && run(args);
 }
 static int compile_shaders() {
   if (shader("empty.comp")) {
@@ -73,7 +85,7 @@ static int compile_shaders() {
 
 #define example(X) { \
   char * args[] = { EXE(CC), "-Wall", "-g", "-IVulkan-Headers/include", "-o", EXE(X), X ".c", 0 }; \
-  if (run(args)) return 1; }
+  if (mtime(X) >= mtime(EXE(X)) && run(args)) return 1; }
 static int compile_examples() {
   example("hello");
   example("reduce");
