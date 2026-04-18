@@ -88,6 +88,7 @@ static int compile_shaders() {
   if (mtime(X) >= mtime(EXE(X)) && run(args)) return 1; }
 static int compile_examples() {
   example("hello");
+  example("info");
   example("reduce");
   example("query");
   return 0;
