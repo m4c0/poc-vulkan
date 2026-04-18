@@ -69,8 +69,12 @@ int main() {
   uint32_t pdsz = 16;
   _(vkEnumeratePhysicalDevices(vlk_ins, &pdsz, pd));
   for (int i = 0; i < pdsz; i++) {
+    VkPhysicalDeviceSubgroupProperties subg = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES,
+    };
     VkPhysicalDeviceMaintenance3Properties prop3 = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_3_PROPERTIES,
+      .pNext = &subg,
     };
     VkPhysicalDeviceProperties2 prop = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
@@ -79,6 +83,7 @@ int main() {
     vkGetPhysicalDeviceProperties2(pd[i], &prop);
     printf("%s\n", prop.properties.deviceName);
     printf("-- Max Memory Allocation Size: %'llu\n", prop3.maxMemoryAllocationSize);
+    printf("-- Subgroup Size: %u\n", subg.subgroupSize);
     printf("\n");
   }
 
