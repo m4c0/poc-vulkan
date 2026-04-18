@@ -64,22 +64,22 @@ static uint64_t mtime(const char * name) {
 #endif
 }
 
-static int shader(char * name) {
+static int shader(char * name, char * tgt) {
   char spv[1024];
   sprintf(spv, "%s.spv", name);
 
-  char * args[] = { EXE("glslang"), "--target-env", "vulkan1.0", name, "-o", spv, 0 };
+  char * args[] = { EXE("glslang"), "-V", "--target-env", tgt, name, "-o", spv, 0 };
   return (mtime(name) >= mtime(spv)) && run(args);
 }
 static int compile_shaders() {
-  if (shader("empty.comp")) {
+  if (shader("empty.comp", "spirv1.0")) {
     fprintf(stderr, "glslang is missing or failing to build empty example - shader compilation disabled\n");
     return 0;
   }
 
-  if (shader("hello.comp")) return 1;
-  if (shader("reduce.comp")) return 1;
-  if (shader("query.comp")) return 1;
+  if (shader("hello.comp",   "spirv1.0")) return 1;
+  if (shader("reduce.comp",  "spirv1.0")) return 1;
+  if (shader("query.comp",   "spirv1.0")) return 1;
   return 0;
 }
 
