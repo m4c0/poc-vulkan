@@ -9,4 +9,5 @@ empty.comp.spv
 *.dylib
 *.exe
 *.pdb
+*.o
 *.swp

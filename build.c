@@ -85,7 +85,7 @@ static int compile_shaders() {
 
 #define example(X) { \
   char * args[] = { EXE(CC), "-Wall", "-g", "-IVulkan-Headers/include", "-o", EXE(X), X ".c", 0 }; \
-  if (mtime(X) >= mtime(EXE(X)) && run(args)) return 1; }
+  if (mtime(X ".c") >= mtime(EXE(X)) && run(args)) return 1; }
 static int compile_examples() {
   example("hello");
   example("info");
@@ -94,11 +94,32 @@ static int compile_examples() {
   return 0;
 }
 
+static int compile_swapchain_example() {
+  { char * args[] = { EXE(CC), "-Wall", "-g", "-c", "-o", "swapchain-osx.o", "swapchain-osx.m", 0 }; 
+    if (mtime("swapchain-osx.o") <= mtime("swapchain-osx.m") && run(args)) return 1; }
+
+  { char * args[] = { EXE(CC), "-Wall", "-g", "-IVulkan-Headers/include", "-o", "swapchain.o", "-c", "swapchain.c", 0 };
+    if (mtime("swapchain.o") <= mtime("swapchain.c") && run(args)) return 1; }
+
+  if (mtime("swapchain.o")     >= mtime(EXE("swapchain")) ||
+      mtime("swapchain-osx.o") >= mtime(EXE("swapchain"))) {
+    char * args[] = {
+      EXE(CC), "-g",
+      "-framework", "AppKit",
+      "-framework", "MetalKit",
+      "-o", EXE("swapchain"), "swapchain.o", "swapchain-osx.o", 0 };
+    return run(args);
+  }
+
+  return 0;
+}
+
 int main(int argc, char ** argv) {
   if (argc != 1) return (usage(), 1);
 
   if (compile_shaders()) return 1;
   if (compile_examples()) return 1;
+  if (compile_swapchain_example()) return 1;
 
   return 0;
 }
