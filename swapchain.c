@@ -338,7 +338,9 @@ void vlk_frame() {
     .pSwapchains = &vlk_swc,
     .pImageIndices = &idx,
   };
-  _(vkQueuePresentKHR(vlk_q, &pres));
+  VkResult res = vkQueuePresentKHR(vlk_q, &pres);
+  // TODO: deal with suboptimal
+  if (res != VK_SUBOPTIMAL_KHR) vlk_check(res, "vkQueuePresentKHR");
 }
 
 void vlk_deinit() {
