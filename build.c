@@ -94,23 +94,29 @@ static int compile_examples() {
   return 0;
 }
 
-static int compile_swapchain_example() {
+static int compile_swapchain_example_(char * src, char * obj, char * exe) {
   { char * args[] = { EXE(CC), "-Wall", "-g", "-c", "-o", "swapchain-osx.o", "swapchain-osx.m", 0 }; 
     if (mtime("swapchain-osx.o") <= mtime("swapchain-osx.m") && run(args)) return 1; }
 
-  { char * args[] = { EXE(CC), "-Wall", "-g", "-IVulkan-Headers/include", "-o", "swapchain.o", "-c", "swapchain.c", 0 };
-    if (mtime("swapchain.o") <= mtime("swapchain.c") && run(args)) return 1; }
+  { char * args[] = { EXE(CC), "-Wall", "-g", "-IVulkan-Headers/include", "-o", obj, "-c", src, 0 };
+    if (mtime(obj) <= mtime(src) && run(args)) return 1; }
 
-  if (mtime("swapchain.o")     >= mtime(EXE("swapchain")) ||
-      mtime("swapchain-osx.o") >= mtime(EXE("swapchain"))) {
+  if (mtime(obj)               >= mtime(exe) ||
+      mtime("swapchain-osx.o") >= mtime(exe)) {
     char * args[] = {
       EXE(CC), "-g",
       "-framework", "AppKit",
       "-framework", "MetalKit",
-      "-o", EXE("swapchain"), "swapchain.o", "swapchain-osx.o", 0 };
+      "-o", exe, obj, "swapchain-osx.o", 0 };
     return run(args);
   }
 
+  return 0;
+}
+#define compile_swapchain_example(X) compile_swapchain_example_(X ".c", X ".o", EXE(X))
+static int compile_swapchain_examples() {
+  if (compile_swapchain_example("swapchain"        )) return 1;
+  if (compile_swapchain_example("swapchain-minimal")) return 1;
   return 0;
 }
 
@@ -119,7 +125,7 @@ int main(int argc, char ** argv) {
 
   if (compile_shaders()) return 1;
   if (compile_examples()) return 1;
-  if (compile_swapchain_example()) return 1;
+  if (compile_swapchain_examples()) return 1;
 
   return 0;
 }
