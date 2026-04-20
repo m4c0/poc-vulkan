@@ -26,6 +26,8 @@ static VkInstance vlk_ins;
 static VkPhysicalDevice vlk_pd;
 static VkQueue vlk_q;
 static VkRenderPass vlk_rp;
+static VkSemaphore vlk_sema_img;
+static VkSemaphore vlk_sema_present;
 static VkSurfaceFormatKHR vlk_surf_fmt;
 static VkSurfaceKHR vlk_surf;
 static VkSwapchainKHR vlk_swc;
@@ -196,6 +198,14 @@ static void vlk_create_framebuffer() {
   _(vkCreateFramebuffer(vlk_dev, &info, NULL, &vlk_fb));
 }
 
+static void vlk_create_semaphores() {
+  VkSemaphoreCreateInfo info = {
+    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+  };
+  _(vkCreateSemaphore(vlk_dev, &info, NULL, &vlk_sema_img));
+  _(vkCreateSemaphore(vlk_dev, &info, NULL, &vlk_sema_present));
+}
+
 static void vlk_create_command_pool() {
   VkCommandPoolCreateInfo info = {
     .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -252,10 +262,9 @@ void vlk_init() {
   vlk_create_swapchain();
   vlk_create_render_pass();
   vlk_create_framebuffer();
+  vlk_create_semaphores();
 }
 
-static VkSemaphore vlk_sema_img;
-static VkSemaphore vlk_sema_present;
 void vlk_frame() {
   unsigned idx;
   vkAcquireNextImageKHR(vlk_dev, vlk_swc, ~0UL, vlk_sema_img, VK_NULL_HANDLE, &idx);
@@ -266,6 +275,8 @@ void vlk_frame() {
   vlk_cmd_end_render_pass(idx);
   vlk_end_command_buffer(idx);
 
+  // TODO: confirm if this is the best and document why
+  VkPipelineStageFlags stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
   // The idea of the wait semaphore is to wait until the swapchain _actually_
   // made the image available
   VkSubmitInfo submit = {
@@ -273,6 +284,7 @@ void vlk_frame() {
     .pCommandBuffers = vlk_cb + idx,
     .commandBufferCount = 1,
     .pWaitSemaphores = &vlk_sema_img,
+    .pWaitDstStageMask = &stage,
     .waitSemaphoreCount = 1,
     .pSignalSemaphores = &vlk_sema_present,
     .signalSemaphoreCount = 1,
@@ -294,6 +306,7 @@ void vlk_frame() {
 }
 
 void vlk_deinit() {
+  // TODO: destroy everything we created.
   vkDeviceWaitIdle(vlk_dev);
   vkDestroyCommandPool(vlk_dev, vlk_cpool, NULL);
   vkDestroyDevice(vlk_dev, NULL);
