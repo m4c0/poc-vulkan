@@ -360,9 +360,19 @@ void vlk_frame() {
 }
 
 void vlk_deinit() {
-  // TODO: destroy everything we created.
   vkDeviceWaitIdle(vlk_dev);
+
+  for (int i = 0; i < vlk_swc_count; i++) {
+    vkDestroyFramebuffer(vlk_dev, vlk_fb[i], NULL);
+    vkDestroyImageView(vlk_dev, vlk_swc_iv[i], NULL);
+  }
+  vkDestroyFence(vlk_dev, vlk_fence, NULL);
+  vkDestroySemaphore(vlk_dev, vlk_sema_img, NULL);
+  vkDestroySemaphore(vlk_dev, vlk_sema_present, NULL);
   vkDestroyCommandPool(vlk_dev, vlk_cpool, NULL);
+  vkDestroyRenderPass(vlk_dev, vlk_rp, NULL);
+  vkDestroySwapchainKHR(vlk_dev, vlk_swc, NULL);
   vkDestroyDevice(vlk_dev, NULL);
-  vkDestroyInstance(volkGetLoadedInstance(), NULL);
+  vkDestroySurfaceKHR(vlk_ins, vlk_surf, NULL);
+  vkDestroyInstance(vlk_ins, NULL);
 }
