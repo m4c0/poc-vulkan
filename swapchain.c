@@ -22,14 +22,17 @@ static VkFramebuffer   vlk_fb      [MAX_SWAPCHAIN_IMAGES];
 static VkImage         vlk_swc_img [MAX_SWAPCHAIN_IMAGES];
 static VkImageView     vlk_swc_iv  [MAX_SWAPCHAIN_IMAGES];
 
+// TODO: multiple "inflights"
+static VkFence     vlk_fence;
+static VkSemaphore vlk_sema_img;
+static VkSemaphore vlk_sema_present;
+
 static VkCommandPool vlk_cpool;
 static VkDevice vlk_dev;
 static VkInstance vlk_ins;
 static VkPhysicalDevice vlk_pd;
 static VkQueue vlk_q;
 static VkRenderPass vlk_rp;
-static VkSemaphore vlk_sema_img;
-static VkSemaphore vlk_sema_present;
 static VkSurfaceFormatKHR vlk_surf_fmt;
 static VkSurfaceKHR vlk_surf;
 static VkSwapchainKHR vlk_swc;
@@ -240,6 +243,14 @@ static void vlk_create_semaphores() {
   _(vkCreateSemaphore(vlk_dev, &info, NULL, &vlk_sema_present));
 }
 
+static void vlk_create_fence() {
+  VkFenceCreateInfo info = {
+    .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+    .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+  };
+  _(vkCreateFence(vlk_dev, &info, NULL, &vlk_fence));
+}
+
 static void vlk_create_command_pool() {
   VkCommandPoolCreateInfo info = {
     .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -299,9 +310,13 @@ void vlk_init() {
   vlk_create_render_pass();
   vlk_create_framebuffer();
   vlk_create_semaphores();
+  vlk_create_fence();
 }
 
 void vlk_frame() {
+  _(vkWaitForFences(vlk_dev, 1, &vlk_fence, VK_TRUE, ~0UL));
+  _(vkResetFences(vlk_dev, 1, &vlk_fence));
+
   unsigned idx;
   vkAcquireNextImageKHR(vlk_dev, vlk_swc, ~0UL, vlk_sema_img, VK_NULL_HANDLE, &idx);
 
@@ -325,7 +340,8 @@ void vlk_frame() {
     .pSignalSemaphores = &vlk_sema_present,
     .signalSemaphoreCount = 1,
   };
-  _(vkQueueSubmit(vlk_q, 1, &submit, NULL));
+  // The fence signals we can reuse the current in-flight
+  _(vkQueueSubmit(vlk_q, 1, &submit, vlk_fence));
 
   // Present is entirely async. We don't have control when it finishes. We then
   // use a semaphore to force it to wait until we finished processing the
