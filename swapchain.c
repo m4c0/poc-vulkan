@@ -131,9 +131,20 @@ static void vlk_create_device() {
 }
 
 static void vlk_create_render_pass() {
+  VkAttachmentDescription att = {
+    .format      = vlk_surf_fmt.format,
+    .samples     = VK_SAMPLE_COUNT_1_BIT,
+    .loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
+    .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+  };
+
   VkSubpassDescription subpass = {0};
+
   VkRenderPassCreateInfo info = {
     .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+    .attachmentCount = 1,
+    .pAttachments = &att,
     .subpassCount = 1,
     .pSubpasses = &subpass,
   };
