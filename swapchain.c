@@ -149,17 +149,27 @@ static void vlk_create_render_pass() {
     .layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
   };
 
+  // Without this, we might face WRITE_AFTER_READ access hazards
+  VkSubpassDependency dep = {
+    .srcSubpass    = VK_SUBPASS_EXTERNAL,
+    .srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    .dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+  };
+
   VkSubpassDescription subpass = {
     .colorAttachmentCount = 1,
-    .pColorAttachments = &ref,
+    .pColorAttachments    = &ref,
   };
 
   VkRenderPassCreateInfo info = {
-    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+    .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
     .attachmentCount = 1,
-    .pAttachments = &att,
-    .subpassCount = 1,
-    .pSubpasses = &subpass,
+    .pAttachments    = &att,
+    .subpassCount    = 1,
+    .pSubpasses      = &subpass,
+    .dependencyCount = 1,
+    .pDependencies   = &dep,
   };
   _(vkCreateRenderPass(vlk_dev, &info, NULL, &vlk_rp));
 }
