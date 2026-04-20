@@ -6,23 +6,43 @@
 #define VOLK_IMPLEMENTATION
 #include "volk.h"
 
+#ifdef __APPLE__
+#include "Vulkan-Headers/include/vulkan/vulkan_metal.h"
+#endif
+
 // not really needed. I'm using because it enables Vim's ctrl-n
 #include "Vulkan-Headers/include/vulkan/vulkan_core.h"
 
-#define _(X) assert(VK_SUCCESS == (X));
+static const VkExtent2D vlk_ext = { 300, 200 };
 
 static VkCommandBuffer vlk_cb;
 static VkCommandPool vlk_cpool;
 static VkDevice vlk_dev;
-static VkExtent2D vlk_ext;
 static VkFramebuffer vlk_fb;
 static VkInstance vlk_ins;
 static VkPhysicalDevice vlk_pd;
 static VkQueue vlk_q;
 static VkRenderPass vlk_rp;
+static VkSwapchainKHR vlk_swc;
 static unsigned vlk_qf;
+static unsigned vlk_swc_count;
+
+static void vlk_check(VkResult r, const char * msg) {
+  if (r == VK_SUCCESS) return;
+  fprintf(stderr, "Vulkan call failed (code=%d): %s\n", r, msg);
+  exit(1);
+}
+#define _(X) vlk_check((X), #X)
 
 static void vlk_create_instance() {
+  const char * ext[] = {
+    0, // Platform-specific
+    VK_KHR_SURFACE_EXTENSION_NAME,
+    // Next two are only used by OSX
+    VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
+    VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+  };
+
   VkApplicationInfo app = {
     .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
     .apiVersion = VK_API_VERSION_1_0,
@@ -30,18 +50,17 @@ static void vlk_create_instance() {
   VkInstanceCreateInfo info = (VkInstanceCreateInfo) {
     .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
     .pApplicationInfo = &app,
+    .ppEnabledExtensionNames = ext,
+    .enabledExtensionCount = 2,
   };
 
 #ifdef __APPLE__
+  ext[0] = VK_EXT_METAL_SURFACE_EXTENSION_NAME;
+
   // MoltenVK kinda requires this extension/flag. It works without it, but the
   // validation layer will complain.
-  const char * ext[] = {
-    VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
-    VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
-  };
   info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-  info.enabledExtensionCount = 2;
-  info.ppEnabledExtensionNames = ext;
+  info.enabledExtensionCount += 2;
 #endif
 
   _(vkCreateInstance(&info, NULL, &vlk_ins));
@@ -67,6 +86,11 @@ static void vlk_find_physical_device() {
 }
 
 static void vlk_create_device() {
+  const char * ext[] = {
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    "VK_KHR_portability_subset",
+  };
+
   const float pri = 1.0f;
   VkDeviceQueueCreateInfo q = (VkDeviceQueueCreateInfo) {
     .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -78,18 +102,51 @@ static void vlk_create_device() {
     .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
     .queueCreateInfoCount = 1,
     .pQueueCreateInfos = &q,
+    .ppEnabledExtensionNames = ext,
+    .enabledExtensionCount = 1,
   };
 
 #ifdef __APPLE__
-  const char * ext[1] = { "VK_KHR_portability_subset" };
+  // It would be more "Vulkan-idiomatic" to test if the current instance has
+  // the portability flag.
   info.ppEnabledExtensionNames = ext;
-  info.enabledExtensionCount = 1;
+  info.enabledExtensionCount++;
 #endif
 
   _(vkCreateDevice(vlk_pd, &info, NULL, &vlk_dev));
   volkLoadDevice(vlk_dev);
 
   vkGetDeviceQueue(vlk_dev, vlk_qf, 0, &vlk_q);
+}
+
+static void vlk_create_render_pass() {
+  VkSubpassDescription subpass = {0};
+  VkRenderPassCreateInfo info = {
+    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+    .subpassCount = 1,
+    .pSubpasses = &subpass,
+  };
+  _(vkCreateRenderPass(vlk_dev, &info, NULL, &vlk_rp));
+}
+
+static void vlk_create_swapchain() {
+  VkSwapchainCreateInfoKHR info = {
+    .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+  };
+  _(vkCreateSwapchainKHR(vlk_dev, &info, NULL, &vlk_swc));
+
+  _(vkGetSwapchainImagesKHR(vlk_dev, vlk_swc, &vlk_swc_count, 0));
+}
+
+static void vlk_create_framebuffer() {
+  VkFramebufferCreateInfo info = {
+    .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+    .renderPass = vlk_rp,
+    .width = vlk_ext.width,
+    .height = vlk_ext.height,
+    .layers = 1,
+  };
+  _(vkCreateFramebuffer(vlk_dev, &info, NULL, &vlk_fb));
 }
 
 static void vlk_create_command_pool() {
@@ -118,6 +175,23 @@ static void vlk_end_command_buffer() {
   vkEndCommandBuffer(vlk_cb);
 }
 
+static void vlk_cmd_begin_render_pass() {
+  VkRenderPassBeginInfo rp = {
+    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+    .renderPass = vlk_rp,
+    .framebuffer = vlk_fb,
+    .renderArea = (VkRect2D) { .extent = vlk_ext },
+    .clearValueCount = 1,
+    .pClearValues = (VkClearValue[]) {
+      (VkClearValue) { .color = {{ 1, 0, 0, 1 }} },
+    },
+  };
+  vkCmdBeginRenderPass(vlk_cb, &rp, VK_SUBPASS_CONTENTS_INLINE);
+}
+static void vlk_cmd_end_render_pass() {
+  vkCmdEndRenderPass(vlk_cb);
+}
+
 static void vlk_submit() {
   VkSubmitInfo info = {
     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -135,24 +209,16 @@ void vlk_init() {
   vlk_create_device();
   vlk_create_command_pool();
   vlk_create_command_buffer();
+  vlk_create_swapchain();
+  vlk_create_render_pass();
+  vlk_create_framebuffer();
 }
 
 void vlk_frame() {
   vlk_begin_command_buffer();
-
-  VkRenderPassBeginInfo rp = {
-    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-    .renderPass = vlk_rp,
-    .framebuffer = vlk_fb,
-    .renderArea = (VkRect2D) { .extent = vlk_ext },
-    .clearValueCount = 1,
-    .pClearValues = (VkClearValue[]) {
-      (VkClearValue) { .color = {{ 1, 0, 0, 1 }} },
-    },
-  };
-  vkCmdBeginRenderPass(vlk_cb, &rp, VK_SUBPASS_CONTENTS_INLINE);
-  vkCmdEndRenderPass(vlk_cb);
-
+  vlk_cmd_begin_render_pass();
+  // Render pass is only used to draw something
+  vlk_cmd_end_render_pass();
   vlk_end_command_buffer();
   vlk_submit();
 }
