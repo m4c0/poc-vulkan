@@ -199,6 +199,7 @@ static void vlk_create_framebuffer() {
 static void vlk_create_command_pool() {
   VkCommandPoolCreateInfo info = {
     .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+    .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
   };
   _(vkCreateCommandPool(vlk_dev, &info, NULL, &vlk_cpool));
 }
@@ -230,22 +231,13 @@ static void vlk_cmd_begin_render_pass(int i) {
     .renderArea = (VkRect2D) { .extent = vlk_ext },
     .clearValueCount = 1,
     .pClearValues = (VkClearValue[]) {
-      (VkClearValue) { .color = {{ 1, 0, 0, 1 }} },
+      (VkClearValue) { .color = {{ 0.1, 0.2, 0.3, 1 }} },
     },
   };
   vkCmdBeginRenderPass(vlk_cb[i], &rp, VK_SUBPASS_CONTENTS_INLINE);
 }
 static void vlk_cmd_end_render_pass(int i) {
   vkCmdEndRenderPass(vlk_cb[i]);
-}
-
-static void vlk_submit(int i) {
-  VkSubmitInfo info = {
-    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-    .pCommandBuffers = vlk_cb + i,
-    .commandBufferCount = 1,
-  };
-  _(vkQueueSubmit(vlk_q, 1, &info, NULL));
 }
 
 void vlk_init() {
@@ -262,16 +254,43 @@ void vlk_init() {
   vlk_create_framebuffer();
 }
 
+static VkSemaphore vlk_sema_img;
+static VkSemaphore vlk_sema_present;
 void vlk_frame() {
-  // TODO: properly acquire the current swapchain image
-  int idx = 0;
+  unsigned idx;
+  vkAcquireNextImageKHR(vlk_dev, vlk_swc, ~0UL, vlk_sema_img, VK_NULL_HANDLE, &idx);
 
   vlk_begin_command_buffer(idx);
   vlk_cmd_begin_render_pass(idx);
-  // Render pass is only used to draw something
+  // Render pass is only used to draw something via its "clear value"
   vlk_cmd_end_render_pass(idx);
   vlk_end_command_buffer(idx);
-  vlk_submit(idx);
+
+  // The idea of the wait semaphore is to wait until the swapchain _actually_
+  // made the image available
+  VkSubmitInfo submit = {
+    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+    .pCommandBuffers = vlk_cb + idx,
+    .commandBufferCount = 1,
+    .pWaitSemaphores = &vlk_sema_img,
+    .waitSemaphoreCount = 1,
+    .pSignalSemaphores = &vlk_sema_present,
+    .signalSemaphoreCount = 1,
+  };
+  _(vkQueueSubmit(vlk_q, 1, &submit, NULL));
+
+  // Present is entirely async. We don't have control when it finishes. We then
+  // use a semaphore to force it to wait until we finished processing the
+  // image.
+  VkPresentInfoKHR pres = {
+    .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+    .pWaitSemaphores = &vlk_sema_present,
+    .waitSemaphoreCount = 1,
+    .swapchainCount = 1,
+    .pSwapchains = &vlk_swc,
+    .pImageIndices = &idx,
+  };
+  _(vkQueuePresentKHR(vlk_q, &pres));
 }
 
 void vlk_deinit() {
