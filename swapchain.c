@@ -199,22 +199,22 @@ static void vlk_create_surface() {
 
 static void vlk_create_swapchain() {
   VkSwapchainCreateInfoKHR info = {
-    .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-    .surface = vlk_surf,
-    .minImageCount = vlk_swc_count,
-    .imageFormat = vlk_surf_fmt.format,
-    .imageColorSpace = vlk_surf_fmt.colorSpace,
-    .imageExtent = vlk_ext,
+    .sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+    .surface          = vlk_surf,
+    .minImageCount    = vlk_swc_count,
+    .imageFormat      = vlk_surf_fmt.format,
+    .imageColorSpace  = vlk_surf_fmt.colorSpace,
+    .imageExtent      = vlk_ext,
     .imageArrayLayers = 1,
     // In theory we can add more usages as well
-    .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-    .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-    .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+    .imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    .compositeAlpha   = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+    .preTransform     = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
     // We can use others modes, if supported, for max FPS or discard frames if
     // CPU faster than GPU
-    .presentMode = VK_PRESENT_MODE_FIFO_KHR,
+    .presentMode      = VK_PRESENT_MODE_FIFO_KHR,
     // Should be "true" unless we want to read clipped parts
-    .clipped = VK_TRUE,
+    .clipped          = VK_TRUE,
   };
   _(vkCreateSwapchainKHR(vlk_dev, &info, NULL, &vlk_swc));
 
