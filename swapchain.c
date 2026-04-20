@@ -26,10 +26,11 @@ static vlk_swc_t vlk_swc_old = {0};
 static VkCommandBuffer vlk_cb      [MAX_SWAPCHAIN_IMAGES];
 static VkImage         vlk_swc_img [MAX_SWAPCHAIN_IMAGES];
 
-// TODO: multiple "inflights"
-static VkFence     vlk_fence;
-static VkSemaphore vlk_sema_img;
-static VkSemaphore vlk_sema_present;
+#define MAX_INFLIGHTS 3
+static VkFence     vlk_fence        [MAX_INFLIGHTS];
+static VkSemaphore vlk_sema_img     [MAX_INFLIGHTS];
+static VkSemaphore vlk_sema_present [MAX_INFLIGHTS];
+static unsigned    vlk_cur_inflight;
 
 static VkCommandPool vlk_cpool;
 static VkDevice vlk_dev;
@@ -262,8 +263,10 @@ static void vlk_create_semaphores() {
   VkSemaphoreCreateInfo info = {
     .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
   };
-  _(vkCreateSemaphore(vlk_dev, &info, NULL, &vlk_sema_img));
-  _(vkCreateSemaphore(vlk_dev, &info, NULL, &vlk_sema_present));
+  for (int i = 0; i < MAX_INFLIGHTS; i++) {
+    _(vkCreateSemaphore(vlk_dev, &info, NULL, vlk_sema_img     + i));
+    _(vkCreateSemaphore(vlk_dev, &info, NULL, vlk_sema_present + i));
+  }
 }
 
 static void vlk_create_fence() {
@@ -271,7 +274,9 @@ static void vlk_create_fence() {
     .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
     .flags = VK_FENCE_CREATE_SIGNALED_BIT,
   };
-  _(vkCreateFence(vlk_dev, &info, NULL, &vlk_fence));
+  for (int i = 0; i < MAX_INFLIGHTS; i++) {
+    _(vkCreateFence(vlk_dev, &info, NULL, vlk_fence + i));
+  }
 }
 
 static void vlk_create_command_pool() {
@@ -355,11 +360,13 @@ void vlk_init() {
 }
 
 void vlk_frame() {
-  _(vkWaitForFences(vlk_dev, 1, &vlk_fence, VK_TRUE, ~0UL));
-  _(vkResetFences(vlk_dev, 1, &vlk_fence));
+  unsigned inf = vlk_cur_inflight;
+
+  _(vkWaitForFences(vlk_dev, 1, vlk_fence + inf, VK_TRUE, ~0UL));
+  _(vkResetFences  (vlk_dev, 1, vlk_fence + inf));
 
   unsigned idx;
-  vkAcquireNextImageKHR(vlk_dev, vlk_swc.swc, ~0UL, vlk_sema_img, VK_NULL_HANDLE, &idx);
+  vkAcquireNextImageKHR(vlk_dev, vlk_swc.swc, ~0UL, vlk_sema_img[inf], VK_NULL_HANDLE, &idx);
 
   vlk_begin_command_buffer(idx);
   vlk_cmd_begin_render_pass(idx);
@@ -375,21 +382,21 @@ void vlk_frame() {
     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
     .pCommandBuffers = vlk_cb + idx,
     .commandBufferCount = 1,
-    .pWaitSemaphores = &vlk_sema_img,
+    .pWaitSemaphores = vlk_sema_img + inf,
     .pWaitDstStageMask = &stage,
     .waitSemaphoreCount = 1,
-    .pSignalSemaphores = &vlk_sema_present,
+    .pSignalSemaphores = vlk_sema_present + inf,
     .signalSemaphoreCount = 1,
   };
   // The fence signals we can reuse the current in-flight
-  _(vkQueueSubmit(vlk_q, 1, &submit, vlk_fence));
+  _(vkQueueSubmit(vlk_q, 1, &submit, vlk_fence[inf]));
 
   // Present is entirely async. We don't have control when it finishes. We then
   // use a semaphore to force it to wait until we finished processing the
   // image.
   VkPresentInfoKHR pres = {
     .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-    .pWaitSemaphores = &vlk_sema_present,
+    .pWaitSemaphores = vlk_sema_present + inf,
     .waitSemaphoreCount = 1,
     .swapchainCount = 1,
     .pSwapchains = &vlk_swc.swc,
@@ -414,9 +421,12 @@ void vlk_deinit() {
   vlk_destroy_swc(&vlk_swc);
   vlk_destroy_swc(&vlk_swc_old);
 
-  vkDestroyFence(vlk_dev, vlk_fence, NULL);
-  vkDestroySemaphore(vlk_dev, vlk_sema_img, NULL);
-  vkDestroySemaphore(vlk_dev, vlk_sema_present, NULL);
+  for (int i = 0; i < MAX_INFLIGHTS; i++) {
+    vkDestroyFence    (vlk_dev, vlk_fence       [i], NULL);
+    vkDestroySemaphore(vlk_dev, vlk_sema_img    [i], NULL);
+    vkDestroySemaphore(vlk_dev, vlk_sema_present[i], NULL);
+  }
+
   vkDestroyCommandPool(vlk_dev, vlk_cpool, NULL);
   vkDestroyRenderPass(vlk_dev, vlk_rp, NULL);
   vkDestroyDevice(vlk_dev, NULL);
