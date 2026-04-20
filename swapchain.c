@@ -331,6 +331,7 @@ void vlk_init() {
   vlk_create_fence();
 }
 
+static bool was_suboptimal = false;
 void vlk_frame() {
   _(vkWaitForFences(vlk_dev, 1, &vlk_fence, VK_TRUE, ~0UL));
   _(vkResetFences(vlk_dev, 1, &vlk_fence));
@@ -375,6 +376,10 @@ void vlk_frame() {
   VkResult res = vkQueuePresentKHR(vlk_q, &pres);
   // TODO: deal with suboptimal
   if (res != VK_SUBOPTIMAL_KHR) vlk_check(res, "vkQueuePresentKHR");
+  if ((res == VK_SUBOPTIMAL_KHR) ^ was_suboptimal) {
+    fprintf(stderr, res == VK_SUBOPTIMAL_KHR ? "suboptimal\n" : "fine\n");
+    was_suboptimal = !was_suboptimal;
+  }
 }
 
 void vlk_deinit() {
