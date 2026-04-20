@@ -32,6 +32,10 @@ void vlk_deinit();
 }
 @end
 
+CAMetalLayer * vlk_metal_layer() {
+  return (CAMetalLayer *)[NSApplication sharedApplication].windows[0].contentView.layer;
+}
+
 static void run() {
   NSDictionary * info = [[NSBundle mainBundle] infoDictionary];
   NSString * name = info[@"CFBundleDisplayName"];

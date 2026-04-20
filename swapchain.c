@@ -3,16 +3,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef __APPLE__
+#define VK_USE_PLATFORM_METAL_EXT
+#endif
+
 #define VOLK_IMPLEMENTATION
 #include "volk.h"
-
-#ifdef __APPLE__
-#include "Vulkan-Headers/include/vulkan/vulkan_metal.h"
-#endif
 
 // not really needed. I'm using because it enables Vim's ctrl-n
 #include "Vulkan-Headers/include/vulkan/vulkan_core.h"
 
+// TODO: read this from "platform"
 static const VkExtent2D vlk_ext = { 300, 200 };
 
 static VkCommandBuffer vlk_cb;
@@ -23,9 +24,15 @@ static VkInstance vlk_ins;
 static VkPhysicalDevice vlk_pd;
 static VkQueue vlk_q;
 static VkRenderPass vlk_rp;
+static VkSurfaceFormatKHR vlk_surf_fmt;
+static VkSurfaceKHR vlk_surf;
 static VkSwapchainKHR vlk_swc;
 static unsigned vlk_qf;
 static unsigned vlk_swc_count;
+
+#ifdef __APPLE__
+CAMetalLayer * vlk_metal_layer();
+#endif
 
 static void vlk_check(VkResult r, const char * msg) {
   if (r == VK_SUCCESS) return;
@@ -129,9 +136,44 @@ static void vlk_create_render_pass() {
   _(vkCreateRenderPass(vlk_dev, &info, NULL, &vlk_rp));
 }
 
+static void vlk_create_surface() {
+#ifdef __APPLE__
+  VkMetalSurfaceCreateInfoEXT info = {
+    .sType = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT,
+    .pLayer = vlk_metal_layer(),
+  };
+  _(vkCreateMetalSurfaceEXT(vlk_ins, &info, NULL, &vlk_surf));
+#endif
+
+  VkSurfaceCapabilitiesKHR cap;
+  _(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vlk_pd, vlk_surf, &cap));
+
+  vlk_swc_count = cap.minImageCount + 1;
+  if (vlk_swc_count > cap.maxImageCount && cap.maxImageCount > 0) vlk_swc_count = cap.maxImageCount;
+
+  uint32_t sz = 1;
+  VkResult res = vkGetPhysicalDeviceSurfaceFormatsKHR(vlk_pd, vlk_surf, &sz, &vlk_surf_fmt);
+  if (res != VK_INCOMPLETE) vlk_check(res, "vkGetPhysicalDeviceSurfaceFormatsKHR invalid return");
+}
+
 static void vlk_create_swapchain() {
   VkSwapchainCreateInfoKHR info = {
     .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+    .surface = vlk_surf,
+    .minImageCount = vlk_swc_count,
+    .imageFormat = vlk_surf_fmt.format,
+    .imageColorSpace = vlk_surf_fmt.colorSpace,
+    .imageExtent = vlk_ext,
+    .imageArrayLayers = 1,
+    // In theory we can add more usages as well
+    .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+    .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+    // We can use others modes, if supported, for max FPS or discard frames if
+    // CPU faster than GPU
+    .presentMode = VK_PRESENT_MODE_FIFO_KHR,
+    // Should be "true" unless we want to read clipped parts
+    .clipped = VK_TRUE,
   };
   _(vkCreateSwapchainKHR(vlk_dev, &info, NULL, &vlk_swc));
 
@@ -206,6 +248,7 @@ void vlk_init() {
 
   vlk_create_instance();
   vlk_find_physical_device();
+  vlk_create_surface();
   vlk_create_device();
   vlk_create_command_pool();
   vlk_create_command_buffer();
