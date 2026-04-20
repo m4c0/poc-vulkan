@@ -13,14 +13,18 @@
 // not really needed. I'm using because it enables Vim's ctrl-n
 #include "Vulkan-Headers/include/vulkan/vulkan_core.h"
 
-// TODO: read this from "platform" or surface
-static const VkExtent2D vlk_ext = { 300, 200 };
-
 #define MAX_SWAPCHAIN_IMAGES 8
+typedef struct vlk_swc {
+  VkFramebuffer   fb  [MAX_SWAPCHAIN_IMAGES];
+  VkImageView     iv  [MAX_SWAPCHAIN_IMAGES];
+  VkSwapchainKHR  swc;
+} vlk_swc_t;
+
+static vlk_swc_t vlk_swc     = {0};
+static vlk_swc_t vlk_swc_old = {0};
+
 static VkCommandBuffer vlk_cb      [MAX_SWAPCHAIN_IMAGES];
-static VkFramebuffer   vlk_fb      [MAX_SWAPCHAIN_IMAGES];
 static VkImage         vlk_swc_img [MAX_SWAPCHAIN_IMAGES];
-static VkImageView     vlk_swc_iv  [MAX_SWAPCHAIN_IMAGES];
 
 // TODO: multiple "inflights"
 static VkFence     vlk_fence;
@@ -29,13 +33,13 @@ static VkSemaphore vlk_sema_present;
 
 static VkCommandPool vlk_cpool;
 static VkDevice vlk_dev;
+static VkExtent2D vlk_ext = { 300, 200 };
 static VkInstance vlk_ins;
 static VkPhysicalDevice vlk_pd;
 static VkQueue vlk_q;
 static VkRenderPass vlk_rp;
 static VkSurfaceFormatKHR vlk_surf_fmt;
 static VkSurfaceKHR vlk_surf;
-static VkSwapchainKHR vlk_swc;
 static unsigned vlk_qf;
 static unsigned vlk_swc_count;
 
@@ -215,10 +219,11 @@ static void vlk_create_swapchain() {
     .presentMode      = VK_PRESENT_MODE_FIFO_KHR,
     // Should be "true" unless we want to read clipped parts
     .clipped          = VK_TRUE,
+    .oldSwapchain     = vlk_swc_old.swc,
   };
-  _(vkCreateSwapchainKHR(vlk_dev, &info, NULL, &vlk_swc));
+  _(vkCreateSwapchainKHR(vlk_dev, &info, NULL, &vlk_swc.swc));
 
-  _(vkGetSwapchainImagesKHR(vlk_dev, vlk_swc, &vlk_swc_count, vlk_swc_img));
+  _(vkGetSwapchainImagesKHR(vlk_dev, vlk_swc.swc, &vlk_swc_count, vlk_swc_img));
 }
 
 static void vlk_create_image_views() {
@@ -234,7 +239,7 @@ static void vlk_create_image_views() {
         .layerCount     = 1,
       },
     };
-    _(vkCreateImageView(vlk_dev, &info, NULL, vlk_swc_iv + i));
+    _(vkCreateImageView(vlk_dev, &info, NULL, vlk_swc.iv + i));
   }
 }
 
@@ -244,12 +249,12 @@ static void vlk_create_framebuffer() {
       .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
       .renderPass      = vlk_rp,
       .attachmentCount = 1,
-      .pAttachments    = vlk_swc_iv + i,
+      .pAttachments    = vlk_swc.iv + i,
       .width           = vlk_ext.width,
       .height          = vlk_ext.height,
       .layers          = 1,
     };
-    _(vkCreateFramebuffer(vlk_dev, &info, NULL, vlk_fb + i));
+    _(vkCreateFramebuffer(vlk_dev, &info, NULL, vlk_swc.fb + i));
   }
 }
 
@@ -303,7 +308,7 @@ static void vlk_cmd_begin_render_pass(int i) {
   VkRenderPassBeginInfo rp = {
     .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
     .renderPass      = vlk_rp,
-    .framebuffer     = vlk_fb[i],
+    .framebuffer     = vlk_swc.fb[i],
     .renderArea      = (VkRect2D) { .extent = vlk_ext },
     .clearValueCount = 1,
     .pClearValues    = &clear
@@ -312,6 +317,24 @@ static void vlk_cmd_begin_render_pass(int i) {
 }
 static void vlk_cmd_end_render_pass(int i) {
   vkCmdEndRenderPass(vlk_cb[i]);
+}
+
+static void vlk_destroy_swc(vlk_swc_t * swc) {
+  for (int i = 0; i < vlk_swc_count; i++) {
+    vkDestroyFramebuffer(vlk_dev, swc->fb[i], NULL);
+    vkDestroyImageView(vlk_dev, swc->iv[i], NULL);
+  }
+  vkDestroySwapchainKHR(vlk_dev, swc->swc, NULL);
+
+  *swc = (vlk_swc_t) {0};
+}
+static void vlk_create_swc() {
+  if (vlk_swc_old.swc) vlk_destroy_swc(&vlk_swc_old);
+  vlk_swc_old = vlk_swc;
+
+  vlk_create_swapchain();
+  vlk_create_image_views();
+  vlk_create_framebuffer();
 }
 
 void vlk_init() {
@@ -323,21 +346,20 @@ void vlk_init() {
   vlk_create_device();
   vlk_create_command_pool();
   vlk_create_command_buffer();
-  vlk_create_swapchain();
-  vlk_create_image_views();
   vlk_create_render_pass();
-  vlk_create_framebuffer();
+  vlk_create_swc();
   vlk_create_semaphores();
   vlk_create_fence();
+
+  vlk_create_swc();
 }
 
-static bool was_suboptimal = false;
 void vlk_frame() {
   _(vkWaitForFences(vlk_dev, 1, &vlk_fence, VK_TRUE, ~0UL));
   _(vkResetFences(vlk_dev, 1, &vlk_fence));
 
   unsigned idx;
-  vkAcquireNextImageKHR(vlk_dev, vlk_swc, ~0UL, vlk_sema_img, VK_NULL_HANDLE, &idx);
+  vkAcquireNextImageKHR(vlk_dev, vlk_swc.swc, ~0UL, vlk_sema_img, VK_NULL_HANDLE, &idx);
 
   vlk_begin_command_buffer(idx);
   vlk_cmd_begin_render_pass(idx);
@@ -370,31 +392,33 @@ void vlk_frame() {
     .pWaitSemaphores = &vlk_sema_present,
     .waitSemaphoreCount = 1,
     .swapchainCount = 1,
-    .pSwapchains = &vlk_swc,
+    .pSwapchains = &vlk_swc.swc,
     .pImageIndices = &idx,
   };
   VkResult res = vkQueuePresentKHR(vlk_q, &pres);
   // TODO: deal with suboptimal
-  if (res != VK_SUBOPTIMAL_KHR) vlk_check(res, "vkQueuePresentKHR");
-  if ((res == VK_SUBOPTIMAL_KHR) ^ was_suboptimal) {
-    fprintf(stderr, res == VK_SUBOPTIMAL_KHR ? "suboptimal\n" : "fine\n");
-    was_suboptimal = !was_suboptimal;
+  if (res != VK_SUBOPTIMAL_KHR) {
+    vlk_check(res, "vkQueuePresentKHR");
+  } else {
+    VkSurfaceCapabilitiesKHR cap;
+    _(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vlk_pd, vlk_surf, &cap));
+    vlk_ext = cap.currentExtent;
+
+    vlk_create_swc();
   }
 }
 
 void vlk_deinit() {
   vkDeviceWaitIdle(vlk_dev);
 
-  for (int i = 0; i < vlk_swc_count; i++) {
-    vkDestroyFramebuffer(vlk_dev, vlk_fb[i], NULL);
-    vkDestroyImageView(vlk_dev, vlk_swc_iv[i], NULL);
-  }
+  vlk_destroy_swc(&vlk_swc);
+  vlk_destroy_swc(&vlk_swc_old);
+
   vkDestroyFence(vlk_dev, vlk_fence, NULL);
   vkDestroySemaphore(vlk_dev, vlk_sema_img, NULL);
   vkDestroySemaphore(vlk_dev, vlk_sema_present, NULL);
   vkDestroyCommandPool(vlk_dev, vlk_cpool, NULL);
   vkDestroyRenderPass(vlk_dev, vlk_rp, NULL);
-  vkDestroySwapchainKHR(vlk_dev, vlk_swc, NULL);
   vkDestroyDevice(vlk_dev, NULL);
   vkDestroySurfaceKHR(vlk_ins, vlk_surf, NULL);
   vkDestroyInstance(vlk_ins, NULL);
