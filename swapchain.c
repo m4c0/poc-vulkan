@@ -144,7 +144,15 @@ static void vlk_create_render_pass() {
     .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
   };
 
-  VkSubpassDescription subpass = {0};
+  VkAttachmentReference ref = {
+    .attachment = 0,
+    .layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+  };
+
+  VkSubpassDescription subpass = {
+    .colorAttachmentCount = 1,
+    .pColorAttachments = &ref,
+  };
 
   VkRenderPassCreateInfo info = {
     .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
