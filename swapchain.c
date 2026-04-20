@@ -17,11 +17,13 @@
 static const VkExtent2D vlk_ext = { 300, 200 };
 
 #define MAX_SWAPCHAIN_IMAGES 8
-static VkCommandBuffer vlk_cb[MAX_SWAPCHAIN_IMAGES];
+static VkCommandBuffer vlk_cb      [MAX_SWAPCHAIN_IMAGES];
+static VkFramebuffer   vlk_fb      [MAX_SWAPCHAIN_IMAGES];
+static VkImage         vlk_swc_img [MAX_SWAPCHAIN_IMAGES];
+static VkImageView     vlk_swc_iv  [MAX_SWAPCHAIN_IMAGES];
 
 static VkCommandPool vlk_cpool;
 static VkDevice vlk_dev;
-static VkFramebuffer vlk_fb;
 static VkInstance vlk_ins;
 static VkPhysicalDevice vlk_pd;
 static VkQueue vlk_q;
@@ -195,18 +197,39 @@ static void vlk_create_swapchain() {
   };
   _(vkCreateSwapchainKHR(vlk_dev, &info, NULL, &vlk_swc));
 
-  _(vkGetSwapchainImagesKHR(vlk_dev, vlk_swc, &vlk_swc_count, 0));
+  _(vkGetSwapchainImagesKHR(vlk_dev, vlk_swc, &vlk_swc_count, vlk_swc_img));
+}
+
+static void vlk_create_image_views() {
+  for (int i = 0; i < vlk_swc_count; i++) {
+    VkImageViewCreateInfo info = {
+      .sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+      .image            = vlk_swc_img[i],
+      .viewType         = VK_IMAGE_VIEW_TYPE_2D,
+      .format           = vlk_surf_fmt.format,
+      .subresourceRange = {
+        .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+        .levelCount     = 1,
+        .layerCount     = 1,
+      },
+    };
+    _(vkCreateImageView(vlk_dev, &info, NULL, vlk_swc_iv + i));
+  }
 }
 
 static void vlk_create_framebuffer() {
-  VkFramebufferCreateInfo info = {
-    .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-    .renderPass = vlk_rp,
-    .width = vlk_ext.width,
-    .height = vlk_ext.height,
-    .layers = 1,
-  };
-  _(vkCreateFramebuffer(vlk_dev, &info, NULL, &vlk_fb));
+  for (int i = 0; i < vlk_swc_count; i++) {
+    VkFramebufferCreateInfo info = {
+      .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+      .renderPass      = vlk_rp,
+      .attachmentCount = 1,
+      .pAttachments    = vlk_swc_iv + i,
+      .width           = vlk_ext.width,
+      .height          = vlk_ext.height,
+      .layers          = 1,
+    };
+    _(vkCreateFramebuffer(vlk_dev, &info, NULL, vlk_fb + i));
+  }
 }
 
 static void vlk_create_semaphores() {
@@ -245,15 +268,16 @@ static void vlk_end_command_buffer(int i) {
 }
 
 static void vlk_cmd_begin_render_pass(int i) {
+  VkClearValue clear = {
+    .color = {{ 0.1, 0.2, 0.3, 1 }},
+  };
   VkRenderPassBeginInfo rp = {
-    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-    .renderPass = vlk_rp,
-    .framebuffer = vlk_fb,
-    .renderArea = (VkRect2D) { .extent = vlk_ext },
+    .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+    .renderPass      = vlk_rp,
+    .framebuffer     = vlk_fb[i],
+    .renderArea      = (VkRect2D) { .extent = vlk_ext },
     .clearValueCount = 1,
-    .pClearValues = (VkClearValue[]) {
-      (VkClearValue) { .color = {{ 0.1, 0.2, 0.3, 1 }} },
-    },
+    .pClearValues    = &clear
   };
   vkCmdBeginRenderPass(vlk_cb[i], &rp, VK_SUBPASS_CONTENTS_INLINE);
 }
@@ -271,6 +295,7 @@ void vlk_init() {
   vlk_create_command_pool();
   vlk_create_command_buffer();
   vlk_create_swapchain();
+  vlk_create_image_views();
   vlk_create_render_pass();
   vlk_create_framebuffer();
   vlk_create_semaphores();
