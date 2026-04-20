@@ -13,10 +13,12 @@
 // not really needed. I'm using because it enables Vim's ctrl-n
 #include "Vulkan-Headers/include/vulkan/vulkan_core.h"
 
-// TODO: read this from "platform"
+// TODO: read this from "platform" or surface
 static const VkExtent2D vlk_ext = { 300, 200 };
 
-static VkCommandBuffer vlk_cb;
+#define MAX_SWAPCHAIN_IMAGES 8
+static VkCommandBuffer vlk_cb[MAX_SWAPCHAIN_IMAGES];
+
 static VkCommandPool vlk_cpool;
 static VkDevice vlk_dev;
 static VkFramebuffer vlk_fb;
@@ -150,7 +152,10 @@ static void vlk_create_surface() {
 
   vlk_swc_count = cap.minImageCount + 1;
   if (vlk_swc_count > cap.maxImageCount && cap.maxImageCount > 0) vlk_swc_count = cap.maxImageCount;
+  assert(vlk_swc_count < MAX_SWAPCHAIN_IMAGES);
 
+  // No concensus on docs or the Internet about how to deal with surface
+  // formats. Picking the first seems to be enough for most cases.
   uint32_t sz = 1;
   VkResult res = vkGetPhysicalDeviceSurfaceFormatsKHR(vlk_pd, vlk_surf, &sz, &vlk_surf_fmt);
   if (res != VK_INCOMPLETE) vlk_check(res, "vkGetPhysicalDeviceSurfaceFormatsKHR invalid return");
@@ -202,22 +207,22 @@ static void vlk_create_command_buffer() {
   VkCommandBufferAllocateInfo info = {
     .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
     .commandPool = vlk_cpool,
-    .commandBufferCount = 1,
+    .commandBufferCount = vlk_swc_count,
   };
-  _(vkAllocateCommandBuffers(vlk_dev, &info, &vlk_cb));
+  _(vkAllocateCommandBuffers(vlk_dev, &info, vlk_cb));
 }
 
-static void vlk_begin_command_buffer() {
+static void vlk_begin_command_buffer(int i) {
   VkCommandBufferBeginInfo info = {
     .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
   };
-  vkBeginCommandBuffer(vlk_cb, &info);
+  vkBeginCommandBuffer(vlk_cb[i], &info);
 }
-static void vlk_end_command_buffer() {
-  vkEndCommandBuffer(vlk_cb);
+static void vlk_end_command_buffer(int i) {
+  vkEndCommandBuffer(vlk_cb[i]);
 }
 
-static void vlk_cmd_begin_render_pass() {
+static void vlk_cmd_begin_render_pass(int i) {
   VkRenderPassBeginInfo rp = {
     .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
     .renderPass = vlk_rp,
@@ -228,16 +233,16 @@ static void vlk_cmd_begin_render_pass() {
       (VkClearValue) { .color = {{ 1, 0, 0, 1 }} },
     },
   };
-  vkCmdBeginRenderPass(vlk_cb, &rp, VK_SUBPASS_CONTENTS_INLINE);
+  vkCmdBeginRenderPass(vlk_cb[i], &rp, VK_SUBPASS_CONTENTS_INLINE);
 }
-static void vlk_cmd_end_render_pass() {
-  vkCmdEndRenderPass(vlk_cb);
+static void vlk_cmd_end_render_pass(int i) {
+  vkCmdEndRenderPass(vlk_cb[i]);
 }
 
-static void vlk_submit() {
+static void vlk_submit(int i) {
   VkSubmitInfo info = {
     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-    .pCommandBuffers = &vlk_cb,
+    .pCommandBuffers = vlk_cb + i,
     .commandBufferCount = 1,
   };
   _(vkQueueSubmit(vlk_q, 1, &info, NULL));
@@ -258,12 +263,15 @@ void vlk_init() {
 }
 
 void vlk_frame() {
-  vlk_begin_command_buffer();
-  vlk_cmd_begin_render_pass();
+  // TODO: properly acquire the current swapchain image
+  int idx = 0;
+
+  vlk_begin_command_buffer(idx);
+  vlk_cmd_begin_render_pass(idx);
   // Render pass is only used to draw something
-  vlk_cmd_end_render_pass();
-  vlk_end_command_buffer();
-  vlk_submit();
+  vlk_cmd_end_render_pass(idx);
+  vlk_end_command_buffer(idx);
+  vlk_submit(idx);
 }
 
 void vlk_deinit() {
