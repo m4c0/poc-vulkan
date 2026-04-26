@@ -18,6 +18,7 @@ CAMetalLayer * g_layer;
   if (!self.ready) {
     g_layer = (CAMetalLayer *)view.layer;
 
+    NSLog(@"vlk_init");
     vlk_init();
     self.ready = YES;
   }
@@ -51,6 +52,7 @@ CAMetalLayer * vlk_metal_layer() { return g_layer; }
 
 int main(int argc, char ** argv) {
   @autoreleasepool {
+    NSLog(@"Starting");
     return UIApplicationMain(argc, argv, nil, @"POCAppDelegate");
   }
 }

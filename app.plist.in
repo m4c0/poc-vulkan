@@ -5,7 +5,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>main</string>
+    <string>poc-vulkan</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
@@ -30,7 +30,7 @@
     <key>CFBundleIdentifier</key>
     <string>&IOS_BUNDLE_ID;</string>
     <key>CFBundleDisplayName</key>
-    <string>Main</string>
+    <string>poc-vulkan</string>
     <key>CFBundleShortVersionString</key>
     <string>1.0.0</string>
     <key>CFBundleSupportedPlatforms</key>

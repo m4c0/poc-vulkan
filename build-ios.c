@@ -149,9 +149,10 @@ static int link_exe() {
   char * args[] = {
     "clang", "-Wall", "-O3", "-target", TARGET, "-isysroot", SDK_PATH,
     "-framework", "CoreFoundation",
+    "-framework", "Foundation",
     "-framework", "MetalKit",
     "-framework", "UIKit",
-    "-o", "export.xcarchive/Products/Applications/main.app/main", 
+    "-o", "export.xcarchive/Products/Applications/main.app/poc-vulkan", 
     "swapchain.o", "swapchain-ios.o",
     0 };
   return run(args);
@@ -165,7 +166,7 @@ int main(int argc, char ** argv) {
   mkdir("export.xcarchive/Products/Applications", 0777);
   mkdir("export.xcarchive/Products/Applications/main.app", 0777);
 
-  if (cc("swapchain.c",      "swapchain.o"   )) return 1;
+  if (cc("swapchain.c",     "swapchain.o"    )) return 1;
   if (cc("swapchain-ios.m", "swapchain-ios.o")) return 1;
   if (link_exe()) return 1;
 
