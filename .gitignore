@@ -9,5 +9,10 @@ empty.comp.spv
 *.dylib
 *.exe
 *.pdb
+*.plist
 *.o
 *.swp
+
+export/
+export.xcarchive/
+
