@@ -5,6 +5,7 @@
 #Therefore, it has to be ignored, unlike other SPIRVs
 empty.comp.spv
 
+*.a
 *.dSYM
 *.dylib
 *.exe

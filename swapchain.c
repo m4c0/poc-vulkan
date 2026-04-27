@@ -4,14 +4,21 @@
 #include <stdlib.h>
 
 #ifdef __APPLE__
-#define VK_USE_PLATFORM_METAL_EXT
+#  include <TargetConditionals.h>
+#  define VK_USE_PLATFORM_METAL_EXT
 #endif
 
-#define VOLK_IMPLEMENTATION
-#include "volk.h"
+#ifndef TARGET_OS_IPHONE
+#  define VOLK_IMPLEMENTATION
+#  include "volk.h"
+#endif
 
 // not really needed. I'm using because it enables Vim's ctrl-n
 #include "Vulkan-Headers/include/vulkan/vulkan_core.h"
+
+#ifdef __APPLE__
+#  include "Vulkan-Headers/include/vulkan/vulkan_metal.h"
+#endif
 
 #define MAX_SWAPCHAIN_IMAGES 8
 typedef struct vlk_swc {
@@ -85,13 +92,16 @@ static void vlk_create_instance() {
 #endif
 
   _(vkCreateInstance(&info, NULL, &vlk_ins));
+
+#ifndef TARGET_OS_IPHONE
   volkLoadInstance(vlk_ins);
+#endif
 }
 
 static void vlk_find_physical_device() {
   VkPhysicalDevice pd[16];
   uint32_t pdsz = 16;
-  _(vkEnumeratePhysicalDevices(volkGetLoadedInstance(), &pdsz, pd));
+  _(vkEnumeratePhysicalDevices(vlk_ins, &pdsz, pd));
   for (int i = 0; i < pdsz; i++) {
     VkQueueFamilyProperties qp[16];
     uint32_t qpsz = 16;
@@ -135,7 +145,9 @@ static void vlk_create_device() {
 #endif
 
   _(vkCreateDevice(vlk_pd, &info, NULL, &vlk_dev));
+#ifndef TARGET_OS_IPHONE
   volkLoadDevice(vlk_dev);
+#endif
 
   vkGetDeviceQueue(vlk_dev, vlk_qf, 0, &vlk_q);
 }
@@ -343,7 +355,9 @@ static void vlk_create_swc() {
 }
 
 void vlk_init() {
+#ifndef TARGET_OS_IPHONE
   _(volkInitialize());
+#endif
 
   vlk_create_instance();
   vlk_find_physical_device();

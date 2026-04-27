@@ -149,11 +149,16 @@ static int link_exe() {
   char * args[] = {
     "clang", "-Wall", "-O3", "-target", TARGET, "-isysroot", SDK_PATH,
     "-framework", "CoreFoundation",
+    "-framework", "CoreGraphics",
     "-framework", "Foundation",
+    "-framework", "IOSurface",
+    "-framework", "Metal",
     "-framework", "MetalKit",
+    "-framework", "QuartzCore",
     "-framework", "UIKit",
     "-o", "export.xcarchive/Products/Applications/main.app/poc-vulkan", 
     "swapchain.o", "swapchain-ios.o",
+    "libMoltenVK.a", "-lc++",
     0 };
   return run(args);
 }
