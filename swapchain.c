@@ -86,10 +86,12 @@ static void vlk_create_instance() {
 #ifdef __APPLE__
   ext[0] = VK_EXT_METAL_SURFACE_EXTENSION_NAME;
 
+#ifndef TARGET_OS_IPHONE
   // MoltenVK kinda requires this extension/flag. It works without it, but the
   // validation layer will complain.
   info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
   info.enabledExtensionCount += 2;
+#endif
 #endif
 
   _(vkCreateInstance(&info, NULL, &vlk_ins));
