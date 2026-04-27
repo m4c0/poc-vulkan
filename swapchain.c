@@ -55,9 +55,10 @@ static unsigned vlk_swc_count;
 CAMetalLayer * vlk_metal_layer();
 #endif
 
+void vlk_log(int r, const char * msg);
 static void vlk_check(VkResult r, const char * msg) {
   if (r == VK_SUCCESS) return;
-  fprintf(stderr, "Vulkan call failed (code=%d): %s\n", r, msg);
+  vlk_log(r, msg);
   exit(1);
 }
 #define _(X) vlk_check((X), #X)

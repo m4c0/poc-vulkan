@@ -50,9 +50,13 @@ CAMetalLayer * g_layer;
 
 CAMetalLayer * vlk_metal_layer() { return g_layer; }
 
+void vlk_log(int r, const char * msg) {
+  NSLog(@"Vulkan call failed (code=%d): %s\n", r, msg);
+  exit(1);
+}
+
 int main(int argc, char ** argv) {
   @autoreleasepool {
-    NSLog(@"Starting");
     return UIApplicationMain(argc, argv, nil, @"POCAppDelegate");
   }
 }
